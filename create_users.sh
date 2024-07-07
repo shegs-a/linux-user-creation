@@ -98,83 +98,54 @@ fi
 
 # -------------------------------- MAIN SCRIPT --------------------------------
 
-# Read from the input file
-# The while loop reads each line from the input file and assigns it to the variable line.
-while IFS= read -r line || [[ -n "$line" ]]; do 
-    # IFS= : Temporarily clears the Internal Field Separator to prevent word splitting on spaces
-    # read -r: Reads a line from the input file into the 'line' variable
-    # || [[ -n "$line" ]]: Ensures the last line is processed even without a newline
+echo "Starting user and group setup..."
+log_message "Starting user and group setup..."
 
-   # Trimming leading spaces and whitespaces
-    trimmed_line=$(echo "$line" | tr -d '[:space:]')  
+# Process user and group information
+while read line; do
+    echo "Processing: $line"
 
-    # Checking for Valid Line Format (semicolon presence)
-    if [[ "$trimmed_line" == *";"* ]]; then  # Check if the line contains a semicolon
+    username=$(echo "$line" | cut -d ';' -f 1)
+    groups=$(echo "$line" | cut -d ';' -f 2)
 
-        # Extracting Username and Groups
-        IFS=';' read -r username groups <<< "$trimmed_line"  # Split the line into username and groups using ';'
-        IFS=',' read -ra group_array <<< "$groups"  # Split the groups string into an array using ','
-
-       # Displaying the Results
-        echo "Username: $username" 
-        echo "Groups: ${group_array[@]}"  # Print all elements of the groups array
-    else
-        # Step 7: Handling Invalid Line Format
-        echo "Invalid format: $line"  # Print an error message if the format is incorrect
-        log_message "Invalid format in input file: $line"
+    # Create the user if they don't exist
+    if ! id "$username" &>/dev/null; then
+        adduser --disabled-password --gecos "" "$username"
+        echo "User $username created!"
     fi
 
-    # Create user passwords
-    if ! getent passwd "$username" &>/dev/null; then
-        useradd -m -s /bin/bash -G "${group_array[*]}" "$username"
-        log_message "User created: $username"
-        password=$(generate_password)  # Generate a password for the user
-        echo "$username:$password" | chpasswd
-        echo "$username:$password" >> "$PASSWORD_FILE"
-        log_message "Password set for user: $username"
-    fi
-
-    # Check if user already exists
-    if getent passwd "$username" &>/dev/null; then
-        log_message "User $username already exists. Skipping user creation."
-        continue
-    fi
-
-    # Add user to groups
-    # If group exists, add the user to the group.
-    # If group doesn't exist, create the group and add the user to it.
-    for group in "${group_array[@]}"; do  # Loop through the groups
-        if getent group "$group" &>/dev/null; then  # Check if the group exists
-            log_message "Group already exists."
-            usermod -aG "$group" "$username"  # Add the user to the group
-            log_message "User added to existing group: $group"
-        else
-            groupadd "$group"  # Create the group if it doesn't exist.
-            log_message "Group created: $group"
-            usermod -aG "$group" "$username"  # Add the user to the group
-            log_message "User added to new group: $group"
+    # Set up groups for the user
+    for group in $(echo "$groups" | tr ',' ' '); do
+        if ! getent group "$group" &>/dev/null; then
+            addgroup "$group"
+            echo "Created new group: $group"
         fi
+        adduser "$username" "$group"
+        echo "Added $username to group $group"
     done
 
-    # Create personal group for the user and add the user to it
-    personal_group="$username"
-    if ! getent group "$personal_group" &>/dev/null; then
-        groupadd "$personal_group"
-        log_message "Personal group created: $personal_group"
-    fi
-    usermod -aG "$personal_group" "$username"
-    log_message "User added to personal group: $personal_group"
+    # Create a personal group for the user
+    addgroup "$username"
+    adduser "$username" "$username"
+    echo "Created personal group $username and added the user to it"
 
-    # Create user's home directory and set necessary permissions
+    # Generate and set a password
+    password=$(generate_password)
+    echo "$username:$password" | chpasswd
+    echo "$username:$password" >> "$PASSWORD_FILE"
+    echo "Password set for $username and logged in $PASSWORD_FILE"
+
+    # Create home directory and set permissions
     mkdir -p "/home/$username"
-    chown "$username:$personal_group" "/home/$username"
+    chown "$username:$username" "/home/$username"
     chmod 700 "/home/$username"
-    log_message "Home directory created for user: $username"
+    echo "Set up home directory for $username"
 
 done < "$INPUT_FILE" # Tells the loop to read from the specified input file
 
-
+# Log the completion of the script.
 log_message "All users and groups have been created."
-echo "All users and groups have been created. Please check the log file for errors." # Display a message to the user
 
+# Display a message to the user.
+echo "All users and groups have been created. Passwords are in $PASSWORD_FILE. Please check $LOG_FILE for errors."
 
