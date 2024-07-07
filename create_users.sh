@@ -65,6 +65,11 @@ if [[ ! -r "$INPUT_FILE" ]]; then
     exit 1
 fi
 
+# Secure the directory of the log file ensuring only the owner can read and write to it.
+LOGFILE_DIR=$(dirname "$LOG_FILE")
+chmod 0700 "$LOGFILE_DIR"
+log_message "Secured directory of the log file: $LOGFILE_DIR"
+
 # Check if the log file exists, if not create it.
 # Setting the permissions to 0600 means that the file is only readable and writable by the owner. In this case, root. 
 # -f checks if the file specified in the $LOG_FILE variable exists.
