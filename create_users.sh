@@ -75,8 +75,7 @@ log_message "Secured directory of the log file: $LOGFILE_DIR"
 # -f checks if the file specified in the $LOG_FILE variable exists.
 if [ ! -f "$LOG_FILE" ]; then
     touch "$LOG_FILE"
-    chmod 0640 "$LOG_FILE"
-    chown root:root "$LOG_FILE"
+    chmod 0600 "$LOG_FILE"
     log_message "Log file created: $LOG_FILE"
 fi
 
