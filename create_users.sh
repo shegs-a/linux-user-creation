@@ -174,3 +174,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < "$INPUT_FILE" # Tells the loop to read from the specified input file
 
 
+log_message "All users and groups have been created."
+echo "All users and groups have been created. Please check the log file for errors." # Display a message to the user
+
+
